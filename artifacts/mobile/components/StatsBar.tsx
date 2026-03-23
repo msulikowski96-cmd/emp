@@ -13,87 +13,48 @@ interface StatsBarProps {
 
 export function StatsBar({ total, visited, active, planned, visitedPct }: StatsBarProps) {
   if (total === 0) return null;
-
   return (
     <View style={styles.container}>
-      <View style={styles.numbers}>
-        <StatItem value={planned} label="Zaplanowane" color={C.statusPlanned} />
-        <View style={styles.divider} />
-        <StatItem value={active} label="W trakcie" color={C.statusActive} />
-        <View style={styles.divider} />
-        <StatItem value={visited} label="Odwiedzone" color={C.statusVisited} />
-        <View style={styles.divider} />
-        <StatItem value={`${visitedPct}%`} label="Ukończone" color={C.text} />
-      </View>
-
-      <View style={styles.progressBar}>
-        <View style={[styles.progressVisited, { flex: visited }]} />
-        <View style={[styles.progressActive, { flex: active }]} />
-        <View style={[styles.progressPlanned, { flex: planned }]} />
+      <Stat value={planned} label="Plan" color={C.statusPlanned} bg="#DBEAFE" />
+      <Stat value={active} label="Aktywne" color={C.statusActive} bg="#FEF3C7" />
+      <Stat value={visited} label="Gotowe" color={C.statusVisited} bg="#D1FAE5" />
+      <View style={styles.pctCol}>
+        <Text style={styles.pctNum}>{visitedPct}%</Text>
+        <Text style={styles.pctLabel}>Ukończone</Text>
+        <View style={styles.miniBar}>
+          <View style={[styles.miniFill, { flex: visited }]} />
+          <View style={[styles.miniRest, { flex: Math.max(total - visited, 0.001) }]} />
+        </View>
       </View>
     </View>
   );
 }
 
-function StatItem({ value, label, color }: { value: number | string; label: string; color: string }) {
+function Stat({ value, label, color, bg }: { value: number; label: string; color: string; bg: string }) {
   return (
-    <View style={styles.statItem}>
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={[styles.statBox, { backgroundColor: bg }]}>
+      <Text style={[styles.statNum, { color }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color }]}>{label}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    gap: 12,
+    flexDirection: "row", gap: 8, marginBottom: 14,
   },
-  numbers: {
-    flexDirection: "row",
-    alignItems: "center",
+  statBox: {
+    flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", gap: 2,
   },
-  statItem: {
-    flex: 1,
-    alignItems: "center",
-    gap: 2,
+  statNum: { fontSize: 22, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  statLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.3, opacity: 0.8 },
+  pctCol: {
+    flex: 1.1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 10,
+    backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, alignItems: "center", gap: 2,
   },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "700",
-    fontFamily: "Inter_700Bold",
-  },
-  statLabel: {
-    fontSize: 10,
-    color: C.textTertiary,
-    fontFamily: "Inter_400Regular",
-    textAlign: "center",
-  },
-  divider: {
-    width: 1,
-    height: 32,
-    backgroundColor: C.border,
-  },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-    flexDirection: "row",
-    backgroundColor: C.backgroundTertiary,
-    overflow: "hidden",
-  },
-  progressVisited: {
-    backgroundColor: C.statusVisited,
-  },
-  progressActive: {
-    backgroundColor: C.statusActive,
-  },
-  progressPlanned: {
-    backgroundColor: C.statusPlanned,
-    opacity: 0.3,
-  },
+  pctNum: { fontSize: 22, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold" },
+  pctLabel: { fontSize: 10, color: C.textTertiary, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.3 },
+  miniBar: { flexDirection: "row", height: 4, borderRadius: 2, overflow: "hidden", width: "100%", marginTop: 4 },
+  miniFill: { backgroundColor: C.statusVisited },
+  miniRest: { backgroundColor: C.backgroundTertiary },
 });

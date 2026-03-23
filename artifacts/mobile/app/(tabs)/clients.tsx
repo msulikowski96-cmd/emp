@@ -1,13 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
   Linking,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,16 +23,32 @@ const C = Colors.light;
 type SortBy = "name" | "priority" | "recent";
 
 const PRIORITY_CONFIG = {
-  high:   { color: "#EF4444", bg: "#FEF2F2", label: "Wysoki" },
-  medium: { color: "#F59E0B", bg: "#FFFBEB", label: "Średni" },
-  low:    { color: "#10B981", bg: "#ECFDF5", label: "Niski"  },
+  high:   { color: "#EF4444", bg: "#FEE2E2", label: "Wysoki",  gradient: ["#EF4444", "#DC2626"] as [string,string] },
+  medium: { color: "#F59E0B", bg: "#FEF3C7", label: "Średni",  gradient: ["#F59E0B", "#D97706"] as [string,string] },
+  low:    { color: "#10B981", bg: "#D1FAE5", label: "Niski",   gradient: ["#10B981", "#059669"] as [string,string] },
 };
 
-const PAYMENT_CONFIG: Record<PaymentStatus, { color: string; label: string; icon: string }> = {
-  ok:       { color: C.success,  label: "OK",       icon: "check-circle" },
-  overdue:  { color: C.warning,  label: "Zaległ.",  icon: "alert-circle" },
-  critical: { color: C.danger,   label: "Krytycz.", icon: "x-circle"     },
+const PAYMENT_CONFIG: Record<PaymentStatus, { color: string; label: string; icon: string; bg: string }> = {
+  ok:       { color: C.success,  bg: "#D1FAE5", label: "OK",        icon: "check-circle" },
+  overdue:  { color: C.warning,  bg: "#FEF3C7", label: "Zaległość", icon: "alert-circle"  },
+  critical: { color: C.danger,   bg: "#FEE2E2", label: "Krytyczny", icon: "x-circle"      },
 };
+
+const AVATAR_COLORS: [string, string][] = [
+  ["#2563EB", "#1D4ED8"],
+  ["#7C3AED", "#6D28D9"],
+  ["#0891B2", "#0E7490"],
+  ["#059669", "#047857"],
+  ["#D97706", "#B45309"],
+  ["#DC2626", "#B91C1C"],
+  ["#9333EA", "#7E22CE"],
+];
+
+function getAvatarColors(name: string): [string, string] {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
 
 function ClientCard({ client, onPress }: { client: Client; onPress: () => void }) {
   const { getClientOrders, getPaymentStatus } = useClientsContext();
@@ -42,6 +57,8 @@ function ClientCard({ client, onPress }: { client: Client; onPress: () => void }
   const payStatus = getPaymentStatus(client);
   const payConfig = PAYMENT_CONFIG[payStatus];
   const clientOrders = getClientOrders(client.id);
+  const avatarColors = getAvatarColors(client.name);
+
   const visitCount = useMemo(() =>
     routes.flatMap((r) => r.stops).filter((s) => (s as any).clientId === client.id && s.status === "visited").length,
     [routes, client.id]
@@ -63,75 +80,86 @@ function ClientCard({ client, onPress }: { client: Client; onPress: () => void }
   };
 
   return (
-    <Pressable style={({ pressed }) => [styles.card, { opacity: pressed ? 0.92 : 1 }]} onPress={onPress}>
-      <View style={[styles.priorityBar, { backgroundColor: pConfig.color }]} />
-      <View style={styles.cardBody}>
-        <View style={styles.cardTop}>
-          <View style={styles.clientAvatar}>
-            <Text style={styles.clientAvatarText}>{client.name.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={styles.clientInfo}>
-            <Text style={styles.clientName} numberOfLines={1}>{client.name}</Text>
-            {client.company && <Text style={styles.clientCompany} numberOfLines={1}>{client.company}</Text>}
-            <View style={styles.addressRow}>
-              <Feather name="map-pin" size={11} color={C.textTertiary} />
-              <Text style={styles.clientAddress} numberOfLines={1}>{client.address}</Text>
-            </View>
-          </View>
-          <View style={styles.cardRight}>
-            <View style={[styles.payBadge, { backgroundColor: payConfig.color + "18" }]}>
-              <Feather name={payConfig.icon as any} size={10} color={payConfig.color} />
-              <Text style={[styles.payBadgeText, { color: payConfig.color }]}>{payConfig.label}</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={C.textTertiary} style={{ marginTop: 4 }} />
-          </View>
-        </View>
+    <Pressable style={({ pressed }) => [styles.card, { opacity: pressed ? 0.94 : 1 }]} onPress={onPress}>
+      <View style={styles.cardInner}>
+        <LinearGradient colors={avatarColors} style={styles.avatar}>
+          <Text style={styles.avatarText}>{client.name.charAt(0).toUpperCase()}</Text>
+        </LinearGradient>
 
-        <View style={styles.cardStats}>
-          <View style={styles.statChip}>
-            <Feather name="check-circle" size={11} color={C.success} />
-            <Text style={styles.statChipText}>{visitCount} wizyt</Text>
+        <View style={styles.clientBody}>
+          <View style={styles.clientTopRow}>
+            <View style={styles.clientNameBlock}>
+              <Text style={styles.clientName} numberOfLines={1}>{client.name}</Text>
+              {client.company && <Text style={styles.clientCompany} numberOfLines={1}>{client.company}</Text>}
+            </View>
+            <View style={styles.badges}>
+              <View style={[styles.priorityBadge, { backgroundColor: pConfig.bg }]}>
+                <Text style={[styles.priorityBadgeText, { color: pConfig.color }]}>{pConfig.label}</Text>
+              </View>
+              <View style={[styles.payBadge, { backgroundColor: payConfig.bg }]}>
+                <Feather name={payConfig.icon as any} size={10} color={payConfig.color} />
+              </View>
+            </View>
           </View>
-          <View style={styles.statChip}>
-            <Feather name="shopping-bag" size={11} color="#8B5CF6" />
-            <Text style={styles.statChipText}>{orderTotal > 0 ? `${orderTotal.toLocaleString("pl-PL")} zł` : "brak zamówień"}</Text>
+
+          <View style={styles.addressRow}>
+            <Feather name="map-pin" size={11} color={C.textTertiary} />
+            <Text style={styles.address} numberOfLines={1}>{client.address}</Text>
           </View>
-          {client.discount > 0 && (
+
+          <View style={styles.statsRow}>
             <View style={styles.statChip}>
-              <Feather name="tag" size={11} color={C.accent} />
-              <Text style={styles.statChipText}>-{client.discount}%</Text>
+              <Feather name="check-circle" size={11} color={C.success} />
+              <Text style={styles.statChipText}>{visitCount} wizyt</Text>
             </View>
-          )}
-        </View>
-
-        <View style={styles.cardActions}>
-          {client.phone && (
-            <Pressable style={styles.actionBtn} onPress={handleCall}>
-              <Feather name="phone" size={14} color={C.success} />
-              <Text style={[styles.actionBtnText, { color: C.success }]}>{client.phone}</Text>
-            </Pressable>
-          )}
-          {client.email && (
-            <Pressable style={[styles.actionBtn, styles.emailBtn]} onPress={handleEmail}>
-              <Feather name="mail" size={14} color={C.accent} />
-              <Text style={[styles.actionBtnText, { color: C.accent }]} numberOfLines={1}>{client.email}</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {client.currentDebt && client.currentDebt > 0 ? (
-          <View style={styles.debtBanner}>
-            <Feather name="alert-triangle" size={12} color={C.warning} />
-            <Text style={styles.debtText}>Zaległość: <Text style={styles.debtValue}>{client.currentDebt.toLocaleString("pl-PL")} zł</Text> · {client.paymentDays} dni</Text>
+            {orderTotal > 0 ? (
+              <View style={styles.statChip}>
+                <Feather name="shopping-bag" size={11} color="#8B5CF6" />
+                <Text style={[styles.statChipText, { color: "#8B5CF6", fontFamily: "Inter_600SemiBold" }]}>
+                  {orderTotal.toLocaleString("pl-PL")} zł
+                </Text>
+              </View>
+            ) : null}
+            {client.discount > 0 && (
+              <View style={styles.statChip}>
+                <Feather name="tag" size={11} color={C.accent} />
+                <Text style={styles.statChipText}>-{client.discount}%</Text>
+              </View>
+            )}
           </View>
-        ) : null}
+
+          {client.currentDebt && client.currentDebt > 0 ? (
+            <View style={styles.debtRow}>
+              <Feather name="alert-triangle" size={11} color={C.warning} />
+              <Text style={styles.debtText}>Zaległość: <Text style={styles.debtVal}>{client.currentDebt.toLocaleString("pl-PL")} zł</Text></Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.cardFooter}>
+        {client.phone && (
+          <Pressable style={styles.footerBtn} onPress={handleCall}>
+            <Feather name="phone" size={13} color={C.success} />
+            <Text style={[styles.footerBtnText, { color: C.success }]}>{client.phone}</Text>
+          </Pressable>
+        )}
+        {client.email && (
+          <Pressable style={[styles.footerBtn, styles.emailBtn]} onPress={handleEmail}>
+            <Feather name="mail" size={13} color={C.accent} />
+            <Text style={[styles.footerBtnText, { color: C.accent }]} numberOfLines={1}>{client.email}</Text>
+          </Pressable>
+        )}
+        <View style={styles.arrowBtn}>
+          <Feather name="chevron-right" size={16} color={C.textTertiary} />
+        </View>
       </View>
     </Pressable>
   );
 }
 
 export default function ClientsScreen() {
-  const { clients, loading } = useClientsContext();
+  const { clients } = useClientsContext();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("name");
@@ -167,30 +195,35 @@ export default function ClientsScreen() {
         data={filtered}
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => (
-          <ClientCard client={item} onPress={() => setSelectedClient(item)} />
+          <View style={styles.cardWrapper}>
+            <ClientCard client={item} onPress={() => setSelectedClient(item)} />
+          </View>
         )}
         ListHeaderComponent={
-          <View style={{ paddingTop: topPad + 16 }}>
-            <View style={styles.header}>
-              <View>
-                <Text style={styles.heroTitle}>Klienci</Text>
-                <Text style={styles.heroSub}>{clients.length} kontrahentów w bazie</Text>
+          <View>
+            <LinearGradient colors={["#0F1D3D", "#162950", "#1E3A5F"]} style={[styles.heroCard, { paddingTop: topPad + 20 }]}>
+              <View style={styles.heroRow}>
+                <View>
+                  <Text style={styles.heroLabel}>BAZA KLIENTÓW</Text>
+                  <Text style={styles.heroTitle}>Klienci</Text>
+                  <Text style={styles.heroSub}>{clients.length} kontrahentów w CRM</Text>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.85 : 1 }]}
+                  onPress={() => setAddVisible(true)}
+                >
+                  <Feather name="user-plus" size={15} color="#fff" />
+                  <Text style={styles.addBtnText}>Dodaj</Text>
+                </Pressable>
               </View>
-              <Pressable
-                style={({ pressed }) => [styles.addBtn, { opacity: pressed ? 0.85 : 1 }]}
-                onPress={() => setAddVisible(true)}
-              >
-                <Feather name="user-plus" size={16} color="#fff" />
-                <Text style={styles.addBtnText}>Dodaj</Text>
-              </Pressable>
-            </View>
+            </LinearGradient>
 
-            <View style={styles.searchRow}>
+            <View style={styles.searchSection}>
               <View style={styles.searchBox}>
                 <Feather name="search" size={16} color={C.textTertiary} />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Szukaj klienta..."
+                  placeholder="Szukaj klienta, firmy, telefonu..."
                   placeholderTextColor={C.textTertiary}
                   value={search}
                   onChangeText={setSearch}
@@ -198,27 +231,28 @@ export default function ClientsScreen() {
                 />
                 {search ? (
                   <Pressable onPress={() => setSearch("")} hitSlop={8}>
-                    <Feather name="x" size={16} color={C.textTertiary} />
+                    <Feather name="x-circle" size={16} color={C.textTertiary} />
                   </Pressable>
                 ) : null}
               </View>
-            </View>
 
-            <View style={styles.sortRow}>
-              {([["name", "A–Z"], ["priority", "Priorytet"], ["recent", "Ostatnio dodani"]] as [SortBy, string][]).map(([v, l]) => (
-                <Pressable
-                  key={v}
-                  style={[styles.sortChip, sortBy === v && styles.sortChipActive]}
-                  onPress={async () => { await Haptics.selectionAsync(); setSortBy(v); }}
-                >
-                  <Text style={[styles.sortText, sortBy === v && styles.sortTextActive]}>{l}</Text>
-                </Pressable>
-              ))}
+              <View style={styles.sortRow}>
+                <Text style={styles.sortLabel}>Sortuj:</Text>
+                {([["name", "A–Z"], ["priority", "Priorytet"], ["recent", "Nowi"]] as [SortBy, string][]).map(([v, l]) => (
+                  <Pressable
+                    key={v}
+                    style={[styles.sortChip, sortBy === v && styles.sortChipActive]}
+                    onPress={async () => { await Haptics.selectionAsync(); setSortBy(v); }}
+                  >
+                    <Text style={[styles.sortText, sortBy === v && styles.sortTextActive]}>{l}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
 
             {filtered.length === 0 && clients.length > 0 && (
               <View style={styles.noResults}>
-                <Feather name="search" size={24} color={C.textTertiary} />
+                <Feather name="search" size={22} color={C.textTertiary} />
                 <Text style={styles.noResultsText}>Brak wyników dla "{search}"</Text>
               </View>
             )}
@@ -227,9 +261,15 @@ export default function ClientsScreen() {
         ListEmptyComponent={
           clients.length === 0 ? (
             <View style={styles.empty}>
-              <View style={styles.emptyIcon}><Feather name="users" size={36} color={C.accent} /></View>
-              <Text style={styles.emptyTitle}>Brak klientów w CRM</Text>
-              <Text style={styles.emptySub}>Dodaj pierwszego kontrahenta – jego dane, warunki handlowe i historię wizyt będziesz miał zawsze pod ręką.</Text>
+              <View style={styles.emptyRing2}>
+                <View style={styles.emptyRing1}>
+                  <View style={styles.emptyIconCenter}>
+                    <Feather name="users" size={28} color="#fff" />
+                  </View>
+                </View>
+              </View>
+              <Text style={styles.emptyTitle}>Baza klientów jest pusta</Text>
+              <Text style={styles.emptySub}>Dodaj pierwszego kontrahenta i miej jego dane, historię wizyt i zamówienia zawsze pod ręką.</Text>
               <Pressable style={styles.emptyBtn} onPress={() => setAddVisible(true)}>
                 <Feather name="user-plus" size={16} color="#fff" />
                 <Text style={styles.emptyBtnText}>Dodaj pierwszego klienta</Text>
@@ -256,69 +296,78 @@ export default function ClientsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background },
-  listContent: { paddingHorizontal: 16 },
-  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 },
-  heroTitle: { fontSize: 28, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold" },
-  heroSub: { fontSize: 13, color: C.textTertiary, fontFamily: "Inter_400Regular", marginTop: 2 },
+  listContent: {},
+  heroCard: { paddingHorizontal: 20, paddingBottom: 24 },
+  heroRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  heroLabel: { fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "Inter_600SemiBold", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 },
+  heroTitle: { fontSize: 26, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  heroSub: { fontSize: 13, color: "rgba(255,255,255,0.5)", fontFamily: "Inter_400Regular", marginTop: 3 },
   addBtn: {
-    backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9,
+    backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
     flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4,
-    shadowColor: C.accent, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4, elevation: 3,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.18)",
   },
-  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  searchRow: { marginBottom: 10 },
+  addBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  searchSection: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   searchBox: {
     flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: C.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
-    borderWidth: 1, borderColor: C.border,
+    backgroundColor: C.surface, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: C.border, marginBottom: 10,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 6, elevation: 2,
   },
   searchInput: { flex: 1, fontSize: 15, color: C.text, fontFamily: "Inter_400Regular" },
-  sortRow: { flexDirection: "row", gap: 6, marginBottom: 16 },
-  sortChip: { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
-  sortChipActive: { backgroundColor: "#EFF6FF", borderColor: C.accent },
+  sortRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  sortLabel: { fontSize: 12, color: C.textTertiary, fontFamily: "Inter_500Medium" },
+  sortChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border },
+  sortChipActive: { backgroundColor: "#DBEAFE", borderColor: C.accent },
   sortText: { fontSize: 12, color: C.textSecondary, fontFamily: "Inter_500Medium" },
   sortTextActive: { color: C.accent, fontFamily: "Inter_600SemiBold" },
-  noResults: { alignItems: "center", gap: 8, paddingTop: 32 },
+  noResults: { alignItems: "center", gap: 8, paddingTop: 40 },
   noResultsText: { fontSize: 14, color: C.textSecondary, fontFamily: "Inter_400Regular" },
+  cardWrapper: { paddingHorizontal: 16, paddingBottom: 0 },
   card: {
-    flexDirection: "row", backgroundColor: C.surface, borderRadius: 14, marginBottom: 10,
+    backgroundColor: C.surface, borderRadius: 18, marginBottom: 10,
     borderWidth: 1, borderColor: C.border, overflow: "hidden",
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4, elevation: 2,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 1, shadowRadius: 10, elevation: 3,
   },
-  priorityBar: { width: 4, flexShrink: 0 },
-  cardBody: { flex: 1, padding: 14, gap: 10 },
-  cardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  clientAvatar: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: "#EFF6FF",
-    alignItems: "center", justifyContent: "center", flexShrink: 0,
-  },
-  clientAvatarText: { fontSize: 18, fontWeight: "700", color: C.accent, fontFamily: "Inter_700Bold" },
-  clientInfo: { flex: 1, gap: 3 },
+  cardInner: { flexDirection: "row", gap: 14, padding: 14 },
+  avatar: { width: 52, height: 52, borderRadius: 16, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  avatarText: { fontSize: 24, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  clientBody: { flex: 1, gap: 6 },
+  clientTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  clientNameBlock: { flex: 1 },
   clientName: { fontSize: 15, fontWeight: "600", color: C.text, fontFamily: "Inter_600SemiBold" },
   clientCompany: { fontSize: 12, color: C.textSecondary, fontFamily: "Inter_400Regular" },
+  badges: { flexDirection: "row", gap: 5, flexShrink: 0 },
+  priorityBadge: { borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
+  priorityBadgeText: { fontSize: 10, fontWeight: "700", fontFamily: "Inter_700Bold" },
+  payBadge: { width: 22, height: 22, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   addressRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  clientAddress: { fontSize: 11, color: C.textTertiary, fontFamily: "Inter_400Regular", flex: 1 },
-  cardRight: { alignItems: "flex-end", gap: 4, flexShrink: 0 },
-  payBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 4 },
-  payBadgeText: { fontSize: 10, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
-  cardStats: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  statChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.backgroundTertiary, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 4 },
+  address: { fontSize: 12, color: C.textTertiary, flex: 1, fontFamily: "Inter_400Regular" },
+  statsRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  statChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.background, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 },
   statChipText: { fontSize: 11, color: C.textSecondary, fontFamily: "Inter_500Medium" },
-  cardActions: { flexDirection: "row", gap: 8 },
-  actionBtn: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#ECFDF5", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, flex: 1 },
-  emailBtn: { backgroundColor: "#EFF6FF" },
-  actionBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
-  debtBanner: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFBEB", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  debtText: { fontSize: 12, color: C.textSecondary, fontFamily: "Inter_400Regular" },
-  debtValue: { fontFamily: "Inter_600SemiBold", color: C.warning },
-  empty: { alignItems: "center", paddingTop: 40, paddingHorizontal: 24, gap: 12 },
-  emptyIcon: { width: 76, height: 76, borderRadius: 20, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center", marginBottom: 4 },
-  emptyTitle: { fontSize: 20, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold", textAlign: "center" },
-  emptySub: { fontSize: 14, color: C.textSecondary, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22 },
-  emptyBtn: {
-    backgroundColor: C.accent, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 24,
-    flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10,
-    shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4,
+  debtRow: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#FFFBEB", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  debtText: { fontSize: 11, color: C.textSecondary, fontFamily: "Inter_400Regular" },
+  debtVal: { fontFamily: "Inter_600SemiBold", color: C.warning },
+  cardFooter: {
+    flexDirection: "row", gap: 0, borderTopWidth: 1, borderTopColor: C.borderLight,
+    paddingHorizontal: 14, paddingVertical: 10,
   },
-  emptyBtnText: { color: "#fff", fontSize: 16, fontWeight: "600", fontFamily: "Inter_600SemiBold" },
+  footerBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#ECFDF5", borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, marginRight: 6 },
+  emailBtn: { backgroundColor: "#EFF6FF" },
+  footerBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", flex: 1 },
+  arrowBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: C.background, alignItems: "center", justifyContent: "center" },
+  empty: { alignItems: "center", paddingTop: 40, paddingHorizontal: 28, gap: 0 },
+  emptyRing2: { width: 120, height: 120, borderRadius: 60, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center", marginBottom: 24 },
+  emptyRing1: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#BFDBFE", alignItems: "center", justifyContent: "center" },
+  emptyIconCenter: { width: 64, height: 64, borderRadius: 32, backgroundColor: C.accent, alignItems: "center", justifyContent: "center" },
+  emptyTitle: { fontSize: 22, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold", textAlign: "center", marginBottom: 10 },
+  emptySub: { fontSize: 14, color: C.textSecondary, fontFamily: "Inter_400Regular", textAlign: "center", lineHeight: 22, marginBottom: 24 },
+  emptyBtn: {
+    backgroundColor: C.accent, borderRadius: 16, paddingVertical: 15, paddingHorizontal: 24,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    shadowColor: C.accent, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
+  },
+  emptyBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", fontFamily: "Inter_700Bold" },
 });

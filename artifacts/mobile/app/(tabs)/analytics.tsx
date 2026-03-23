@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo } from "react";
 import { FlatList, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,30 +10,50 @@ import { useRouteContext } from "@/context/RouteContext";
 const C = Colors.light;
 const DAY_NAMES = ["Nd", "Pn", "Wt", "Śr", "Cz", "Pt", "So"];
 
-function KpiCard({ icon, label, value, sub, color, bg }: { icon: string; label: string; value: string; sub?: string; color: string; bg: string }) {
+interface KpiCardProps {
+  icon: string;
+  label: string;
+  value: string;
+  sub?: string;
+  gradient: [string, string];
+}
+function KpiCard({ icon, label, value, sub, gradient }: KpiCardProps) {
   return (
-    <View style={[styles.kpiCard, { borderLeftColor: color }]}>
-      <View style={[styles.kpiIcon, { backgroundColor: bg }]}>
-        <Feather name={icon as any} size={18} color={color} />
+    <LinearGradient colors={gradient} style={styles.kpiCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <View style={styles.kpiIconBox}>
+        <Feather name={icon as any} size={20} color="rgba(255,255,255,0.8)" />
       </View>
-      <View style={styles.kpiContent}>
-        <Text style={styles.kpiLabel}>{label}</Text>
-        <Text style={[styles.kpiValue, { color }]}>{value}</Text>
-        {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
+      <Text style={styles.kpiValue}>{value}</Text>
+      <Text style={styles.kpiLabel}>{label}</Text>
+      {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
+    </LinearGradient>
+  );
+}
+
+function SectionHeader({ icon, title, badge }: { icon: string; title: string; badge?: string }) {
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionIconBox}>
+        <Feather name={icon as any} size={14} color={C.accent} />
       </View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {badge ? <View style={styles.sectionBadge}><Text style={styles.sectionBadgeText}>{badge}</Text></View> : null}
     </View>
   );
 }
 
-function WeekBar({ day, visits, maxVisits }: { day: string; visits: number; maxVisits: number }) {
-  const h = maxVisits > 0 ? Math.max(4, (visits / maxVisits) * 80) : 4;
+function WeekBar({ day, visits, maxVisits, isToday }: { day: string; visits: number; maxVisits: number; isToday: boolean }) {
+  const h = maxVisits > 0 ? Math.max(6, (visits / maxVisits) * 88) : 6;
   return (
     <View style={styles.barCol}>
-      <Text style={styles.barValue}>{visits > 0 ? visits : ""}</Text>
+      {visits > 0 && <Text style={[styles.barValue, isToday && { color: C.accent }]}>{visits}</Text>}
       <View style={styles.barTrack}>
-        <View style={[styles.barFill, { height: h, backgroundColor: visits > 0 ? C.accent : C.border }]} />
+        {visits > 0
+          ? <LinearGradient colors={isToday ? [C.accent, C.accentDark] : ["#93C5FD", "#60A5FA"]} style={[styles.barFill, { height: h }]} />
+          : <View style={[styles.barFill, { height: 6, backgroundColor: C.backgroundTertiary }]} />}
       </View>
-      <Text style={styles.barDay}>{day}</Text>
+      <Text style={[styles.barDay, isToday && styles.barDayToday]}>{day}</Text>
+      {isToday && <View style={styles.todayDot} />}
     </View>
   );
 }
@@ -43,39 +64,29 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const botPad = Platform.OS === "web" ? 34 : insets.bottom;
-
   const today = new Date().toISOString().split("T")[0];
 
   const todayStats = useMemo(() => {
     if (!todayRoute) return { total: 0, visited: 0, planned: 0, rate: 0 };
     const total = todayRoute.stops.length;
     const visited = todayRoute.stops.filter((s) => s.status === "visited").length;
-    const planned = total - visited;
-    const rate = total > 0 ? Math.round((visited / total) * 100) : 0;
-    return { total, visited, planned, rate };
+    return { total, visited, planned: total - visited, rate: total > 0 ? Math.round((visited / total) * 100) : 0 };
   }, [todayRoute]);
 
-  const todayRevenue = useMemo(() => {
-    return orders.filter((o) => o.date.startsWith(today) && o.status !== "cancelled")
-      .reduce((s, o) => s + o.total, 0);
-  }, [orders, today]);
+  const todayRevenue = useMemo(() => orders.filter((o) => o.date.startsWith(today) && o.status !== "cancelled").reduce((s, o) => s + o.total, 0), [orders, today]);
 
   const weekData = useMemo(() => {
     const now = new Date();
-    const days: { date: string; dayName: string; visits: number; revenue: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now);
-      d.setDate(d.getDate() - i);
+      d.setDate(d.getDate() - (6 - i));
       const dateStr = d.toISOString().split("T")[0];
       const route = routes.find((r) => r.date === dateStr);
       const visits = route ? route.stops.filter((s) => s.status === "visited").length : 0;
-      const revenue = orders
-        .filter((o) => o.date.startsWith(dateStr) && o.status !== "cancelled")
-        .reduce((s, o) => s + o.total, 0);
-      days.push({ date: dateStr, dayName: DAY_NAMES[d.getDay()], visits, revenue });
-    }
-    return days;
-  }, [routes, orders]);
+      const revenue = orders.filter((o) => o.date.startsWith(dateStr) && o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+      return { dateStr, dayName: DAY_NAMES[d.getDay()], visits, revenue, isToday: dateStr === today };
+    });
+  }, [routes, orders, today]);
 
   const weekVisits = weekData.reduce((s, d) => s + d.visits, 0);
   const weekRevenue = weekData.reduce((s, d) => s + d.revenue, 0);
@@ -86,85 +97,79 @@ export default function AnalyticsScreen() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
     const monthRoutes = routes.filter((r) => r.date >= monthStart);
     const totalVisits = monthRoutes.flatMap((r) => r.stops).filter((s) => s.status === "visited").length;
-    const totalStops = monthRoutes.flatMap((r) => r.stops).length;
     const daysWorked = new Set(monthRoutes.filter((r) => r.stops.length > 0).map((r) => r.date)).size;
-    const avgPerDay = daysWorked > 0 ? (totalVisits / daysWorked).toFixed(1) : "0";
-    return { totalVisits, totalStops, daysWorked, avgPerDay };
+    return { totalVisits, daysWorked, avgPerDay: daysWorked > 0 ? (totalVisits / daysWorked).toFixed(1) : "0" };
   }, [routes]);
 
   const monthRevenue = useMemo(() => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    return orders.filter((o) => o.date >= monthStart && o.status !== "cancelled")
-      .reduce((s, o) => s + o.total, 0);
+    return orders.filter((o) => o.date >= monthStart && o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
   }, [orders]);
 
-  const topClients = useMemo(() => {
-    return clients
-      .map((c) => {
-        const clientOrders = orders.filter((o) => o.clientId === c.id && o.status !== "cancelled");
-        const revenue = clientOrders.reduce((s, o) => s + o.total, 0);
-        const visitCount = routes.flatMap((r) => r.stops).filter((s) => (s as any).clientId === c.id && s.status === "visited").length;
-        return { client: c, revenue, orderCount: clientOrders.length, visitCount };
-      })
-      .filter((x) => x.revenue > 0 || x.visitCount > 0)
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 8);
-  }, [clients, orders, routes]);
-
-  const allTimeVisits = useMemo(() =>
-    routes.flatMap((r) => r.stops).filter((s) => s.status === "visited").length,
-    [routes]
+  const topClients = useMemo(() =>
+    clients.map((c) => {
+      const cOrders = orders.filter((o) => o.clientId === c.id && o.status !== "cancelled");
+      const revenue = cOrders.reduce((s, o) => s + o.total, 0);
+      const visitCount = routes.flatMap((r) => r.stops).filter((s) => (s as any).clientId === c.id && s.status === "visited").length;
+      return { client: c, revenue, orderCount: cOrders.length, visitCount };
+    }).filter(x => x.revenue > 0 || x.visitCount > 0).sort((a, b) => b.revenue - a.revenue).slice(0, 8),
+    [clients, orders, routes]
   );
 
-  const fmt = (n: number) => n.toLocaleString("pl-PL") + " zł";
+  const allTimeVisits = useMemo(() => routes.flatMap((r) => r.stops).filter((s) => s.status === "visited").length, [routes]);
+  const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k zł` : `${n.toLocaleString("pl-PL")} zł`;
 
-  const sections = [
-    { key: "header" },
-    { key: "today" },
-    { key: "week" },
-    { key: "month" },
-    { key: "clients" },
-  ];
+  const sections = [{ key: "header" }, { key: "today" }, { key: "week" }, { key: "month" }, { key: "clients" }];
 
   const renderSection = ({ item }: { item: { key: string } }) => {
     if (item.key === "header") return (
-      <View style={[styles.header, { paddingTop: topPad + 16 }]}>
+      <LinearGradient colors={["#0F1D3D", "#162950", "#1E3A5F"]} style={[styles.heroCard, { paddingTop: topPad + 20 }]}>
+        <Text style={styles.heroLabel}>ANALITYKA SPRZEDAŻY</Text>
         <Text style={styles.heroTitle}>Raporty</Text>
-        <Text style={styles.heroSub}>Analityka Twojej sprzedaży</Text>
-      </View>
+        <View style={styles.heroKpiRow}>
+          <View style={styles.heroKpi}>
+            <Text style={styles.heroKpiNum}>{allTimeVisits}</Text>
+            <Text style={styles.heroKpiLabel}>wizyt łącznie</Text>
+          </View>
+          <View style={styles.heroKpiDivider} />
+          <View style={styles.heroKpi}>
+            <Text style={styles.heroKpiNum}>{clients.length}</Text>
+            <Text style={styles.heroKpiLabel}>klientów CRM</Text>
+          </View>
+          <View style={styles.heroKpiDivider} />
+          <View style={styles.heroKpi}>
+            <Text style={[styles.heroKpiNum, { color: "#C4B5FD" }]}>{monthRevenue > 0 ? fmt(monthRevenue) : "—"}</Text>
+            <Text style={styles.heroKpiLabel}>przychód (mies.)</Text>
+          </View>
+        </View>
+      </LinearGradient>
     );
 
     if (item.key === "today") return (
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Feather name="sun" size={14} color={C.statusActive} />
-          <Text style={styles.sectionTitle}>Dziś</Text>
-        </View>
+        <SectionHeader icon="sun" title="Dzisiejszy dzień" />
         <View style={styles.kpiGrid}>
-          <KpiCard icon="map-pin" label="Klientów" value={`${todayStats.total}`} sub="zaplanowanych" color="#2563EB" bg="#EFF6FF" />
-          <KpiCard icon="check-circle" label="Odwiedzonych" value={`${todayStats.visited}`} sub={`${todayStats.rate}% ukończone`} color={C.success} bg="#ECFDF5" />
-          <KpiCard icon="shopping-bag" label="Zamówienia" value={todayRevenue > 0 ? fmt(todayRevenue) : "—"} color="#8B5CF6" bg="#F5F3FF" />
-          <KpiCard icon="clock" label="Pozostałe" value={`${todayStats.planned}`} color={C.warning} bg="#FFFBEB" />
+          <KpiCard icon="users" label="Klientów" value={`${todayStats.total}`} sub="zaplanowanych" gradient={["#1E40AF", "#2563EB"]} />
+          <KpiCard icon="check-circle" label="Odwiedzone" value={`${todayStats.visited}`} sub={`${todayStats.rate}% ukończone`} gradient={["#065F46", "#10B981"]} />
+          <KpiCard icon="shopping-bag" label="Zamówienia" value={todayRevenue > 0 ? fmt(todayRevenue) : "—"} gradient={["#5B21B6", "#8B5CF6"]} />
+          <KpiCard icon="clock" label="Pozostałe" value={`${todayStats.planned}`} gradient={["#92400E", "#F59E0B"]} />
         </View>
       </View>
     );
 
     if (item.key === "week") return (
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Feather name="calendar" size={14} color={C.accent} />
-          <Text style={styles.sectionTitle}>Ostatnie 7 dni</Text>
-          <View style={styles.sectionBadge}>
-            <Text style={styles.sectionBadgeText}>{weekVisits} wizyt · {weekRevenue > 0 ? fmt(weekRevenue) : "brak zamówień"}</Text>
-          </View>
-        </View>
-
+        <SectionHeader
+          icon="calendar"
+          title="Ostatnie 7 dni"
+          badge={weekVisits > 0 ? `${weekVisits} wizyt${weekRevenue > 0 ? ` · ${fmt(weekRevenue)}` : ""}` : undefined}
+        />
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>Wizyty u klientów</Text>
-          <View style={styles.barsContainer}>
+          <View style={styles.barsRow}>
             {weekData.map((d) => (
-              <WeekBar key={d.date} day={d.dayName} visits={d.visits} maxVisits={maxVisits} />
+              <WeekBar key={d.dateStr} day={d.dayName} visits={d.visits} maxVisits={maxVisits} isToday={d.isToday} />
             ))}
           </View>
         </View>
@@ -173,68 +178,56 @@ export default function AnalyticsScreen() {
 
     if (item.key === "month") return (
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Feather name="trending-up" size={14} color="#8B5CF6" />
-          <Text style={styles.sectionTitle}>Ten miesiąc</Text>
-        </View>
+        <SectionHeader icon="trending-up" title="Ten miesiąc" />
         <View style={styles.kpiGrid}>
-          <KpiCard icon="check-circle" label="Wizyty łącznie" value={`${monthStats.totalVisits}`} sub={`${monthStats.daysWorked} dni roboczych`} color={C.success} bg="#ECFDF5" />
-          <KpiCard icon="activity" label="Śr./dzień" value={`${monthStats.avgPerDay}`} sub="wizyt dziennie" color={C.accent} bg="#EFF6FF" />
-          <KpiCard icon="shopping-bag" label="Przychód" value={monthRevenue > 0 ? fmt(monthRevenue) : "—"} color="#8B5CF6" bg="#F5F3FF" />
-          <KpiCard icon="users" label="Klientów" value={`${clients.length}`} sub="w bazie CRM" color="#0891B2" bg="#ECFEFF" />
-        </View>
-        <View style={[styles.kpiCard, { borderLeftColor: C.textTertiary, marginTop: 0 }]}>
-          <View style={[styles.kpiIcon, { backgroundColor: C.backgroundTertiary }]}>
-            <Feather name="bar-chart-2" size={18} color={C.textSecondary} />
-          </View>
-          <View style={styles.kpiContent}>
-            <Text style={styles.kpiLabel}>Wszystkie wizyty (łącznie)</Text>
-            <Text style={[styles.kpiValue, { color: C.text }]}>{allTimeVisits}</Text>
-            <Text style={styles.kpiSub}>od początku używania aplikacji</Text>
-          </View>
+          <KpiCard icon="check-circle" label="Wizyty" value={`${monthStats.totalVisits}`} sub={`${monthStats.daysWorked} dni pracy`} gradient={["#065F46", "#10B981"]} />
+          <KpiCard icon="activity" label="Śr./dzień" value={`${monthStats.avgPerDay}`} sub="wizyt dziennie" gradient={["#1E40AF", "#3B82F6"]} />
+          <KpiCard icon="shopping-bag" label="Przychód" value={monthRevenue > 0 ? fmt(monthRevenue) : "—"} gradient={["#5B21B6", "#8B5CF6"]} />
+          <KpiCard icon="users" label="Klienci" value={`${clients.length}`} sub="w CRM" gradient={["#0C4A6E", "#0891B2"]} />
         </View>
       </View>
     );
 
     if (item.key === "clients") return (
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Feather name="star" size={14} color="#F59E0B" />
-          <Text style={styles.sectionTitle}>Top klienci wg przychodu</Text>
-        </View>
+        <SectionHeader icon="star" title="Top klienci wg przychodu" />
         {topClients.length === 0 ? (
           <View style={styles.emptyChart}>
-            <Feather name="bar-chart" size={28} color={C.textTertiary} />
+            <Feather name="bar-chart" size={32} color={C.textTertiary} />
+            <Text style={styles.emptyChartTitle}>Brak danych</Text>
             <Text style={styles.emptyChartText}>Dodaj klientów i zamówienia, aby zobaczyć ranking</Text>
           </View>
         ) : (
-          topClients.map((item, i) => {
-            const maxRev = topClients[0].revenue;
-            const barW = maxRev > 0 ? `${Math.max(5, (item.revenue / maxRev) * 100)}%` : "5%";
-            return (
-              <View key={item.client.id} style={styles.clientRankRow}>
-                <View style={styles.rankNum}>
-                  <Text style={styles.rankNumText}>{i + 1}</Text>
-                </View>
-                <View style={styles.rankContent}>
-                  <View style={styles.rankTop}>
-                    <Text style={styles.rankName} numberOfLines={1}>{item.client.name}</Text>
-                    <Text style={styles.rankRevenue}>{item.revenue > 0 ? fmt(item.revenue) : "—"}</Text>
+          <View style={styles.rankCard}>
+            {topClients.map((item, i) => {
+              const maxRev = topClients[0].revenue;
+              const pct = maxRev > 0 ? Math.max(5, (item.revenue / maxRev) * 100) : 5;
+              return (
+                <View key={item.client.id} style={[styles.rankRow, i < topClients.length - 1 && styles.rankRowBorder]}>
+                  <View style={[styles.rankNum, i < 3 && { backgroundColor: ["#FEF3C7", "#F1F5F9", "#FEE2E2"][i] }]}>
+                    <Text style={[styles.rankNumText, i < 3 && { color: ["#D97706", "#64748B", "#DC2626"][i] }]}>{i + 1}</Text>
                   </View>
-                  <View style={styles.rankBarTrack}>
-                    <View style={[styles.rankBarFill, { width: barW as any }]} />
-                  </View>
-                  <View style={styles.rankSub}>
+                  <View style={styles.rankContent}>
+                    <View style={styles.rankTopRow}>
+                      <Text style={styles.rankName} numberOfLines={1}>{item.client.name}</Text>
+                      <Text style={[styles.rankRevenue, !item.revenue && { color: C.textTertiary }]}>
+                        {item.revenue > 0 ? fmt(item.revenue) : "—"}
+                      </Text>
+                    </View>
+                    {item.revenue > 0 && (
+                      <View style={styles.rankBarTrack}>
+                        <LinearGradient colors={["#8B5CF6", "#7C3AED"]} style={[styles.rankBarFill, { width: `${pct}%` as any }]} />
+                      </View>
+                    )}
                     <Text style={styles.rankSubText}>{item.orderCount} zamówień · {item.visitCount} wizyt</Text>
                   </View>
                 </View>
-              </View>
-            );
-          })
+              );
+            })}
+          </View>
         )}
       </View>
     );
-
     return null;
   };
 
@@ -244,7 +237,7 @@ export default function AnalyticsScreen() {
         data={sections}
         keyExtractor={(s) => s.key}
         renderItem={renderSection}
-        contentContainerStyle={[styles.listContent, { paddingBottom: botPad + 100 }]}
+        contentContainerStyle={[{ paddingBottom: botPad + 100 }]}
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -253,48 +246,60 @@ export default function AnalyticsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.background },
-  listContent: { paddingHorizontal: 16 },
-  header: { paddingBottom: 20 },
-  heroTitle: { fontSize: 28, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold" },
-  heroSub: { fontSize: 13, color: C.textTertiary, fontFamily: "Inter_400Regular", marginTop: 2 },
-  section: { marginBottom: 24 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
-  sectionTitle: { fontSize: 14, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold", flex: 1 },
-  sectionBadge: { backgroundColor: C.backgroundTertiary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  sectionBadgeText: { fontSize: 11, color: C.textSecondary, fontFamily: "Inter_500Medium" },
-  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
+  heroCard: { paddingHorizontal: 20, paddingBottom: 24 },
+  heroLabel: { fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "Inter_600SemiBold", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 4 },
+  heroTitle: { fontSize: 26, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold", marginBottom: 18 },
+  heroKpiRow: { flexDirection: "row", alignItems: "center" },
+  heroKpi: { flex: 1, alignItems: "center" },
+  heroKpiNum: { fontSize: 18, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  heroKpiLabel: { fontSize: 10, color: "rgba(255,255,255,0.4)", fontFamily: "Inter_400Regular", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.3 },
+  heroKpiDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.12)" },
+  section: { paddingHorizontal: 16, marginTop: 24 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
+  sectionIconBox: { width: 28, height: 28, borderRadius: 8, backgroundColor: "#DBEAFE", alignItems: "center", justifyContent: "center" },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: C.text, fontFamily: "Inter_700Bold", flex: 1 },
+  sectionBadge: { backgroundColor: C.backgroundTertiary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  sectionBadgeText: { fontSize: 11, color: C.textSecondary, fontFamily: "Inter_600SemiBold" },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   kpiCard: {
-    backgroundColor: C.surface, borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: C.border, borderLeftWidth: 3,
-    flexDirection: "row", alignItems: "center", gap: 12,
-    flex: 1, minWidth: "45%",
-    shadowColor: C.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 3, elevation: 1,
-    marginBottom: 0,
+    flex: 1, minWidth: "45%", borderRadius: 16, padding: 16, gap: 4,
+    shadowColor: "rgba(15,23,42,0.15)", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 10, elevation: 4,
   },
-  kpiIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  kpiContent: { flex: 1, gap: 2 },
-  kpiLabel: { fontSize: 11, color: C.textTertiary, fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.3 },
-  kpiValue: { fontSize: 20, fontWeight: "700", fontFamily: "Inter_700Bold" },
-  kpiSub: { fontSize: 10, color: C.textTertiary, fontFamily: "Inter_400Regular" },
-  chartCard: { backgroundColor: C.surface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: C.border },
-  chartTitle: { fontSize: 13, fontWeight: "600", color: C.textSecondary, fontFamily: "Inter_600SemiBold", marginBottom: 16 },
-  barsContainer: { flexDirection: "row", alignItems: "flex-end", gap: 0 },
-  barCol: { flex: 1, alignItems: "center", gap: 4 },
-  barValue: { fontSize: 11, color: C.accent, fontFamily: "Inter_700Bold", height: 16 },
-  barTrack: { height: 80, justifyContent: "flex-end" },
-  barFill: { width: 20, borderRadius: 5 },
+  kpiIconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", marginBottom: 6 },
+  kpiValue: { fontSize: 24, fontWeight: "700", color: "#fff", fontFamily: "Inter_700Bold" },
+  kpiLabel: { fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "Inter_500Medium", textTransform: "uppercase", letterSpacing: 0.3 },
+  kpiSub: { fontSize: 11, color: "rgba(255,255,255,0.5)", fontFamily: "Inter_400Regular", marginTop: 2 },
+  chartCard: {
+    backgroundColor: C.surface, borderRadius: 18, padding: 18,
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 2,
+  },
+  chartTitle: { fontSize: 13, fontWeight: "600", color: C.textSecondary, fontFamily: "Inter_600SemiBold", marginBottom: 20, textTransform: "uppercase", letterSpacing: 0.5 },
+  barsRow: { flexDirection: "row", alignItems: "flex-end" },
+  barCol: { flex: 1, alignItems: "center", gap: 5 },
+  barValue: { fontSize: 12, fontWeight: "700", color: "#60A5FA", fontFamily: "Inter_700Bold" },
+  barTrack: { height: 88, justifyContent: "flex-end" },
+  barFill: { width: 22, borderRadius: 6 },
   barDay: { fontSize: 11, color: C.textTertiary, fontFamily: "Inter_500Medium" },
-  clientRankRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 12 },
-  rankNum: { width: 24, height: 24, borderRadius: 8, backgroundColor: C.backgroundTertiary, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  barDayToday: { color: C.accent, fontFamily: "Inter_700Bold" },
+  todayDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.accent },
+  rankCard: {
+    backgroundColor: C.surface, borderRadius: 18, overflow: "hidden",
+    borderWidth: 1, borderColor: C.border,
+    shadowColor: C.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 2,
+  },
+  rankRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
+  rankRowBorder: { borderBottomWidth: 1, borderBottomColor: C.borderLight },
+  rankNum: { width: 28, height: 28, borderRadius: 9, backgroundColor: C.backgroundTertiary, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   rankNumText: { fontSize: 12, fontWeight: "700", color: C.textSecondary, fontFamily: "Inter_700Bold" },
-  rankContent: { flex: 1, gap: 4 },
-  rankTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  rankName: { fontSize: 13, fontWeight: "600", color: C.text, fontFamily: "Inter_600SemiBold", flex: 1 },
-  rankRevenue: { fontSize: 13, fontWeight: "700", color: "#8B5CF6", fontFamily: "Inter_700Bold" },
-  rankBarTrack: { height: 6, backgroundColor: C.backgroundTertiary, borderRadius: 3, overflow: "hidden" },
-  rankBarFill: { height: 6, backgroundColor: "#8B5CF6", borderRadius: 3 },
-  rankSub: {},
+  rankContent: { flex: 1, gap: 5 },
+  rankTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  rankName: { fontSize: 14, fontWeight: "600", color: C.text, fontFamily: "Inter_600SemiBold", flex: 1 },
+  rankRevenue: { fontSize: 14, fontWeight: "700", color: "#8B5CF6", fontFamily: "Inter_700Bold" },
+  rankBarTrack: { height: 5, backgroundColor: C.backgroundTertiary, borderRadius: 3, overflow: "hidden" },
+  rankBarFill: { height: 5, borderRadius: 3 },
   rankSubText: { fontSize: 10, color: C.textTertiary, fontFamily: "Inter_400Regular" },
-  emptyChart: { alignItems: "center", gap: 8, paddingVertical: 32 },
+  emptyChart: { backgroundColor: C.surface, borderRadius: 18, padding: 40, alignItems: "center", gap: 10, borderWidth: 1, borderColor: C.border },
+  emptyChartTitle: { fontSize: 16, fontWeight: "600", color: C.text, fontFamily: "Inter_600SemiBold" },
   emptyChartText: { fontSize: 13, color: C.textTertiary, fontFamily: "Inter_400Regular", textAlign: "center" },
 });
