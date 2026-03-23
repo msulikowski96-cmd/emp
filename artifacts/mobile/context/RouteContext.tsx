@@ -7,6 +7,7 @@ export type Priority = "high" | "medium" | "low";
 
 export interface RouteStop {
   id: string;
+  clientId?: string;
   name: string;
   address: string;
   phone?: string;
