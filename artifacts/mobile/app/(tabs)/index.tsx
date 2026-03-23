@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   heroStatNumLarge: { fontSize: 26 },
   heroStatLabel: { fontSize: 10, color: "rgba(255,255,255,0.5)", fontFamily: "Inter_400Regular", marginTop: 2, textTransform: "uppercase", letterSpacing: 0.3 },
   heroStatDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.12)" },
-  heroProgressOuter: { height: 5, borderRadius: 3, flexDirection: "row", overflow: "hidden", borderRadius: 99 },
+  heroProgressOuter: { height: 5, flexDirection: "row", overflow: "hidden", borderRadius: 99 },
   heroProgressFill: { backgroundColor: "#34D399" },
   heroEmpty: { fontSize: 13, color: "rgba(255,255,255,0.4)", fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },
   content: { paddingHorizontal: 16, paddingTop: 16 },
